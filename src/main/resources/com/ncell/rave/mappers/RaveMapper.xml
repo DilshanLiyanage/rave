@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+<mapper namespace="com.ncell.rave.mappers.RaveMapper">
+
+
+
+
+	<!-- 2) Get category list | GET /rave/categories -->
+	<select id="getAllCategories" resultType="Category">
+		select * from rave_category order by id
+	</select>
+
+
+
+
+
+
+
+
+	<!-- 3) Send a Rave | POST /employee/{empID}/rave -->
+	<insert id="insertRave" useGeneratedKeys="true" keyProperty="raveSender.id"
+		keyColumn="id" parameterType="RaveSender">
+		insert into rave(comment,sent_on,category,send_by)
+		values(#{raveSender.comment},now(),#{raveSender.category},#{empID})
+		
+		
+	</insert>
+
+	<insert id="insertRaveRecipients">
+		insert into rave_recipients(received_by,rave)
+		value
+		<foreach item="elements" index="index" collection="raveSender.coEmployees"
+			separator=",">
+			(#{elements},#{raveSender.id})
+		</foreach>
+	</insert>
+
+	<insert id="insertRaveWitness">
+		insert into rave_witness(rave,witnessed_by)
+		values
+		<foreach item="elements" index="index" collection="raveSender.witness"
+			separator=",">
+			(#{raveSender.id},#{elements})
+		</foreach>
+	</insert>
+
+	<resultMap type="Raves" id="RaveMap">
+		<id property="id" column="id" />
+		<result property="categoryName" column="category_name" />
+		<result property="comment" column="comment" />
+		<result property="sent" column="sent" />
+
+		<result property="timestamp" column="timestamp" />
+		<collection property="coEmployees" javaType="List" ofType="RaveRecieved">
+			<id property="resId" column="res_id" />
+			<result property="resName" column="res_name" />
+			<result property="resDesignation" column="res_designation" />
+			<result property="resProfileImage" column="res_profile_image" />
+		</collection>
+
+		<collection property="acknowledgedBy" javaType="List"
+			ofType="RaveRecieved">
+			<id property="resId" column="acknowledgedBy" />
+		</collection>
+
+	</resultMap>
+
+	<select id="getFinalInsertedRave" resultType="Raves" resultMap="RaveMap"
+		parameterType="RaveSender">
+		SELECT
+		r.id AS id,
+		u.id AS res_id,
+		u.first_name AS res_name,
+		u.designation AS res_designation,
+		u.profile_image AS res_profile_image,
+		rc.name AS category_name,
+		r.comment AS comment,
+		true AS sent,
+		rk.acknowledged_by AS acknowledged_by,
+		r.sent_on AS timestamp
+		FROM
+		rave r,
+		rave_category rc,
+		rave_recipients rr,
+		rave_acknowledgement rk,
+		user u
+		WHERE
+		r.id=#{raveSender.id}
+		AND
+		r.category = rc.id
+		AND
+		#{raveSender.id}=rr.rave
+		AND
+		rr.received_by=u.id
+		OR
+		(rk.rave = #{raveSender.id} )
+	</select>
+
+
+
+
+
+		
+
+	<select id="getRaves" resultType="Raves" resultMap="RaveMap">
+
+		<if test="sent == 'true'">
+
+			<if test="category != null">
+					SELECT
+					r.id AS id,
+					u.id AS res_id,
+					u.first_name AS res_name,
+					u.designation AS res_designation,
+					u.profile_image AS res_profile_image,
+					rc.name AS category_name,
+					r.comment AS comment,
+					true AS sent,
+					rk.acknowledged_by AS acknowledged_by,
+					r.sent_on AS timestamp
+					FROM
+					rave r,
+					rave_category rc,
+					rave_recipients rr,
+					rave_acknowledgement rk,
+					user u
+					WHERE
+					r.send_by=#{empID}
+					AND
+					r.category = #{category}
+					AND
+					r.id=rr.rave
+					AND
+					rr.received_by=u.id
+					OR
+					(rk.rave = r.id)
+					ORDER by r.id DESC
+					LIMIT #{limit}
+					OFFSET #{offset}
+					
+			</if>
+
+			<if test="category == null">
+					SELECT
+					r.id AS id,
+					u.id AS res_id,
+					u.first_name AS res_name,
+					u.designation AS res_designation,
+					u.profile_image AS res_profile_image,
+					rc.name AS category_name,
+					r.comment AS comment,
+					true AS sent,
+					rk.acknowledged_by AS acknowledged_by,
+					r.sent_on AS timestamp
+					FROM
+					rave r,
+					rave_category rc,
+					rave_recipients rr,
+					rave_acknowledgement rk,
+					user u
+					WHERE
+					r.send_by=#{empID}
+					AND
+					r.category = rc.id
+					AND
+					r.id=rr.rave
+					AND
+					rr.received_by=u.id
+					OR
+					(rk.rave = r.id)
+					ORDER by r.id DESC
+					LIMIT #{limit}
+					OFFSET #{offset}
+			</if>
+
+		</if>
+
+
+		<if test="sent == 'false'">
+			<if test="category != null">
+					SELECT
+					r.id AS id,
+					u.id AS res_id,
+					u.first_name AS res_name,
+					u.designation AS res_designation,
+					u.profile_image AS res_profile_image,
+					rc.name AS category_name,
+					r.comment AS comment,
+					false AS sent,
+					rk.acknowledged_by AS acknowledged_by,
+					r.sent_on AS timestamp
+					FROM
+					rave r,
+					rave_category rc,
+					rave_recipients rr,
+					rave_acknowledgement rk,
+					user u
+					WHERE
+					rr.received_by=#{empID}
+					AND
+					r.category = #{category}
+					AND
+					r.id=rr.rave
+					AND
+					r.send_by=u.id
+					OR
+					(rk.rave = r.id)
+					ORDER by r.id DESC
+					LIMIT #{limit}
+					OFFSET #{offset}
+			</if>
+
+			<if test="category == null">
+				SELECT
+					r.id AS id,
+					u.id AS res_id,
+					u.first_name AS res_name,
+					u.designation AS res_designation,
+					u.profile_image AS res_profile_image,
+					rc.name AS category_name,
+					r.comment AS comment,
+					false AS sent,
+					rk.acknowledged_by AS acknowledged_by,
+					r.sent_on AS timestamp
+					FROM
+					rave r,
+					rave_category rc,
+					rave_recipients rr,
+					rave_acknowledgement rk,
+					user u
+					WHERE
+					rr.received_by=#{empID}
+					AND
+					r.category = rc.id
+					AND
+					r.id=rr.rave
+					AND
+					r.send_by=u.id
+					OR
+					(rk.rave = r.id)
+					ORDER by r.id DESC
+					LIMIT #{limit}
+					OFFSET #{offset}
+			</if>
+
+		</if>
+
+
+
+
+
+	</select>
+
+	
+
+</mapper>
+
+
+	
+	
