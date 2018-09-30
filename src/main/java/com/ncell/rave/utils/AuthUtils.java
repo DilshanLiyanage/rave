@@ -6,8 +6,5 @@ public class AuthUtils {
 		return token;
 	}
 	
-	public static String getStatus() {
-		return "gsggg";
-	}
-
+	
 }
